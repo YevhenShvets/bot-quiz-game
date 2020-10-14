@@ -31,19 +31,8 @@ dp = Dispatcher(bot)
 @dp.message_handler(commands=['start'])
 async def send_welcome(message: types.Message):
 	chat_id = message.chat.id
-	logger.info('Chat_id:' + str(chat_id))
-	if chat_id < 0:
-		with open('chats_id.txt', 'w+') as f:
-			list_id = [str(s) for s in f.readline()]
-			b = True
-			for _id in list_id:
-				if _id == str(chat_id):
-					b = False
-					break
-			if b:
-				f.write(str(chat_id))
-
-	await message.reply(f"Hi!\nI'm EchoBot!\n{hbold(message.from_user.full_name)}", parse_mode=types.ParseMode.HTML)
+	logger.info('start/  Chat_id:' + str(chat_id) + " Name: " + str(message.from_user.full_name))
+	await message.reply(f"Дай боже {hbold(message.from_user.full_name)}\nЯ бот для ігри в слова\n/game - для реєстрації\n/startgame - розпочати гру\n/top - Рейтинг гравців\n/stopgame - закінити гру", parse_mode=types.ParseMode.HTML)
 
 
 async def pre_start_game(message: types.Message):
@@ -62,12 +51,13 @@ async def game_presentation(message: types.Message):
 
 
 async def game_players(message: types.Message, game: Game):
-	text ="<b>Гравці:</b>\n" + game.get_users()
+	text ="<b>Гравці: </b>\n" + game.get_users()
 	await message.answer(text=text, parse_mode=types.ParseMode.HTML)
 
 
 @dp.message_handler(commands=['game'])
 async def new_game(message: types.Message):
+	logger.info('game/  Chat_id:' + str(message.chat.id) + " Name: " + str(message.from_user.full_name))
 	g = Game(message.chat.id)
 	if g.is_active():
 		await message.reply("<b>Гра ще активна</b>\n/stopgame - для виходу з поточної гри", parse_mode=types.ParseMode.HTML)
@@ -82,6 +72,7 @@ async def new_game(message: types.Message):
 
 @dp.message_handler(commands=['startgame'])
 async def start_game(message: types.Message):
+	logger.info('startgame/  Chat_id:' + str(message.chat.id) + " Name: " + str(message.from_user.full_name))
 	id_chat = message.chat.id
 	g = Game(chat_id=id_chat)
 	if g.get_users():
@@ -91,12 +82,15 @@ async def start_game(message: types.Message):
 		w = WordGame(chat_id=id_chat)
 		w.set_users(g.get_users_list())
 		await game_players(message, g)
+		username_link = w.get_next_answer_user()
+		await message.answer(text=f'Першим ходить {username_link}', parse_mode=types.ParseMode.HTML)
 	else:
 		await message.reply("<b>В грі 0 гравців</b>\n/game - для реєстрації гравців", parse_mode=types.ParseMode.HTML)
 
 
 @dp.message_handler(commands=['stopgame'])
 async def stop_game(message: types.Message):
+	logger.info('stopgame/  Chat_id:' + str(message.chat.id) + " Name: " + str(message.from_user.full_name))
 	id_chat = message.chat.id
 	g = Game(chat_id=id_chat)
 	if g.is_active():
@@ -107,7 +101,8 @@ async def stop_game(message: types.Message):
 
 
 @dp.message_handler(commands=['top'])
-async def stop_game(message: types.Message):
+async def top_game(message: types.Message):
+	logger.info('top/  Chat_id:' + str(message.chat.id) + " Name: " + str(message.from_user.full_name))
 	id_chat = message.chat.id
 	g = Game(chat_id=id_chat)
 	if g.is_active():
@@ -129,7 +124,7 @@ async def process_callback(callback_query: types.CallbackQuery):
 				g.save()
 				inline_markup = types.InlineKeyboardMarkup()
 				c_data = '{"message_id":' + str(callback_query.message.message_id) + ', "name":"add"}'
-				button_in = types.InlineKeyboardButton("Go", callback_data=c_data)
+				button_in = types.InlineKeyboardButton("Приєднатись", callback_data=c_data)
 				inline_markup.add(button_in)
 
 				m_id = _dict['message_id']
@@ -141,51 +136,68 @@ async def process_callback(callback_query: types.CallbackQuery):
 				await bot.answer_callback_query(callback_query.id, ("Ви вже в грі"))
 
 
-@dp.message_handler(regexp='(^cat[s]?$|puss)')
-async def cats(message: types.Message):
-	with open('data/cats.jpg', 'rb') as photo:
-		'''
-		# Old fashioned way:
-		await bot.send_photo(
-			message.chat.id,
-			photo,
-			caption='Cats are here 😺',
-			reply_to_message_id=message.message_id,
-		)
-		'''
-
-		await message.reply_photo(photo, caption='Cats are here 😺')
-
-
 @dp.message_handler()
 async def check(message: types.Message):
+	logger.info('message  Chat_id:' + str(message.chat.id) + " Name: " + str(message.from_user.full_name) + " Message: " + message.text)
+	if if_mat(message.text):
+		answer = if_mat(message.text)
+		await message.reply(text=answer)
+
 	g = Game(chat_id=message.chat.id)
-	logger.info("in check")
 	if correct_message(message.text) and g.is_active():
-		logger.info("in corect")
 		id_user = message.from_user.id
 		stat = len(message.text)
 		word = message.text
-		logger.info("info" + str(id_user))
 		wg = WordGame(chat_id=message.chat.id)
-		is_add = wg.word_right(word)
-		logger.info("info" + str(id_user) + "is_add" + str(is_add))
-		if is_add == 1:
-			wg.set_user_stat(id_user=id_user, stat=stat)
-			wg.add_word(word)
-			await message.answer(f"Далі на букву <b>{word[-1].upper()}</b>", parse_mode=types.ParseMode.HTML)
-		elif is_add == 2:
-			await message.reply("<i>Дане слово не відповідає вимогам гри</i>", parse_mode=types.ParseMode.HTML)
-			await message.answer(f"Повторно на букву <b>{wg.last_word()[-1].upper()}</b>", parse_mode=types.ParseMode.HTML)
-		elif is_add == 3:
-			await message.reply("<i>Дане слово вже використовувалося</i>", parse_mode=types.ParseMode.HTML)
-			await message.answer(f"Повторно на букву <b>{wg.last_word()[-1].upper()}</b>", parse_mode=types.ParseMode.HTML)
+		if wg.get_answer_user_id() == id_user:
+			is_add = wg.word_right(word)
+			username_link = wg.get_next_answer_user(b=False)
+			if is_add == 1:
+				wg.set_user_stat(id_user=id_user, stat=stat)
+				username_link = wg.get_next_answer_user()
+				wg.add_word(word)
+				await message.answer(f"Далі на букву <b>{word[-1].upper()}</b>\nВідповідає {username_link}", parse_mode=types.ParseMode.HTML)
+			elif is_add == 2:
+				await message.reply("<i>Дане слово не відповідає вимогам гри</i>", parse_mode=types.ParseMode.HTML)
+				await message.answer(f"Повторно на букву <b>{wg.last_word()[-1].upper()}</b>\nВідповідає {username_link}", parse_mode=types.ParseMode.HTML)
+			elif is_add == 3:
+				await message.reply("<i>Дане слово вже використовувалося</i>", parse_mode=types.ParseMode.HTML)
+				await message.answer(f"Повторно на букву <b>{wg.last_word()[-1].upper()}</b>\nВідповідає {username_link}", parse_mode=types.ParseMode.HTML)
+			elif is_add == 4:
+				await message.reply("<i>Ви використали символи а не слово</i>", parse_mode=types.ParseMode.HTML)
+				await message.answer(f"Відповідає {username_link}", parse_mode=types.ParseMode.HTML)
+		else:
+			await message.reply('<b>Не ваш хід</b>', parse_mode=types.ParseMode.HTML)
+			username_link = wg.get_next_answer_user(b=False)
+			await message.answer(f"Повторно на букву <b>{wg.last_word()[-1].upper()}</b>\nВідповідає {username_link}", parse_mode=types.ParseMode.HTML)
 
 
 def correct_message(text):
 	if text[0] not in punctuation:
 		return True
 	return False
+
+
+def if_mat(text):
+	mat_list = [
+		{
+			'mat': 'бля',
+			'answer': 'ха муха'
+		},
+		{
+			'mat': 'сука',
+			'answer': 'сам сука, смотри рекламу'
+		},
+		{
+			'mat': 'хуй',
+			'answer': 'соси'
+		}
+	]
+
+	for mat in mat_list:
+		if mat['mat'] in text:
+			return mat['answer']
+	return ''
 
 
 async def main():

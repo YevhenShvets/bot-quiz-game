@@ -1,1 +1,0 @@
-{'chat_id': 684734168, 'users': [{'id': 684734168, 'name': 'Yevhen Shvets'}], 'users_stat': {684734168: 8}, 'words': ['gthz', 'zsdf']}
