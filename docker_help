@@ -1,0 +1,2 @@
+docker build -t python_quiz_bot .
+docker run -it --rm --name puthon_quiz_bot_running python_quiz_bot
