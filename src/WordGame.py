@@ -2,29 +2,33 @@ import os
 import ast
 from string import punctuation
 
+from .database_commands import *
+
 
 class WordGame:
+    game_id = 0
     chat_id = 0
     users = []
     users_stat = {}
     words = []
-    answer_id = -1
+    answer_id = 0
 
     def __init__(self, chat_id):
         self.chat_id = chat_id
-        d = read_word_game(chat_id)
+        d = select_game(chat_id)
         if d:
             self.chat_id = int(d['chat_id'])
-            self.users = list(map(dict, d['users']))
-            self.users_stat = dict(d['users_stat'])
-            self.words = list(map(str, d['words']))
-            self.answer_id = int(d['answer_id'])
+            self.game_id = int(d['id'])
+            self.users = select_user_list(d['id'])
+            self.users_stat = select_game_stat(d['id'])
+            self.words = select_game_words(d['id'])
+            self.answer_id = int(d['last_user_id'])
         else:
             self.chat_id = chat_id
             self.users = []
             self.users_stat = {}
             self.words = []
-            self.answer_id = -1
+            self.answer_id = 0
             self.save()
 
     def set_users(self, users):
@@ -34,16 +38,16 @@ class WordGame:
         self.save()
 
     def get_next_answer_user(self, b=True):
-        if b == False:
+        if not b:
             if self.answer_id == -1:
                 self.answer_id = 0
         else:
             if self.answer_id == -1:
                 self.answer_id = 0
-            elif self.answer_id == len(self.users)-1:
+            elif self.answer_id == len(self.users) - 1:
                 self.answer_id = 0
             else:
-                self.answer_id = self.answer_id+1
+                self.answer_id = self.answer_id + 1
 
         user = self.users[self.answer_id]
         s = f'<a href="tg://user?id={user["id"]}">{user["name"]}</a>\n'
@@ -55,8 +59,10 @@ class WordGame:
             return self.users[self.answer_id]['id']
         return None
 
-    def add_word(self, word):
+    def add_word(self, word, user_id):
         self.words.append(word.lower())
+        insert_word(self.game_id, word.lower(), user_id)
+        update_user_stat(self.game_id, user_id, len(word))
         self.save()
 
     def set_user_stat(self, id_user, stat):
@@ -106,34 +112,17 @@ class WordGame:
         return users_str
 
     def save(self):
-        data = {
-            "chat_id": self.chat_id,
-            "users": self.users,
-            "users_stat": self.users_stat,
-            "words": self.words,
-            "answer_id": self.answer_id
-        }
-        name = str(self.chat_id)
-        with open(f'src/data/start_games/{name}.txt', 'w') as f:
-            f.write(str(data))
-
-
-def read_word_game(chat_id):
-    data = ''
-    if os.path.exists(f'src/data/start_games/{chat_id}.txt'):
-        with open(f'src/data/start_games/{chat_id}.txt', 'r') as f:
-            data = f.read()
-        data = ast.literal_eval(data)
-    return data
+        update_game(self.game_id, len(select_user_list(self.game_id)), self.answer_id)
 
 
 def askiii(word):
     for w in word:
-        if ord(w) >= 1040 and ord(w) < 1120:
+        if 1040 <= ord(w) < 1120:
             continue
         else:
             return False
     return True
+
 
 def len_ch(word):
     l = []
